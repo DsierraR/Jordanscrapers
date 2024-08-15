@@ -25,7 +25,7 @@ jobs:
         if: github.event.inputs.run-now != 'true' && github.event.inputs.schedule-time != ''
         uses: austenstone/schedule@v1.3
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN }}
           workflow: ${{ github.workflow }}
           date: ${{ github.event.inputs.schedule-time }}
 
