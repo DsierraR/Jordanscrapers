@@ -2,7 +2,7 @@ name: run main.py
 
 on:
   schedule:
-    - cron: '59 0 * * *' # At 00:00 on Monday
+    - cron: '20 1 * * *' # At 00:00 on Monday
 
 jobs:
   build:
@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v2 # checkout the repository content to github runner
 
       - name: setup python
-        uses: actions/setup-python@v4
+        uses: austenstone/schedule@v1.3
         with:
           python-version: '3.9' # install the python version needed
           
