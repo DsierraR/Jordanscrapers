@@ -2,7 +2,7 @@ name: Scheduled Python Job
 
 on:
   schedule:
-    - cron: '30 13 * * *'  # Runs every 5 minutes
+    - cron: '55 7 * * *'  # Runs every 5 minutes
   workflow_dispatch:
 
 jobs:
