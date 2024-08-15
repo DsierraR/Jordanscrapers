@@ -2,7 +2,7 @@ name: Scheduled Python Job
 
 on:
   schedule:
-    - cron: '34 7 * * *'  # Run daily at midnight UTC
+    - cron: '*/5 * * * *'  # Runs every 5 minutes
   workflow_dispatch:
 
 jobs:
@@ -11,6 +11,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+
+      - name: Run test script
+        run: |
+          echo "This is a test run at $(date)"
 
       - name: Set up Python
         uses: actions/setup-python@v4
