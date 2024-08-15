@@ -291,7 +291,7 @@ def send_email(excel_buffer, changes):
     sender_email = "dsierraramirez115@gmail.com"
     receiver_email = "diegosierra01@yahoo.com"
         
-    password = "qmdm rqgv bork eukg"  # App-specific password for Gmail
+    password = password = os.environ['EMAIL_PASSWORD']  # App-specific password for Gmail
 
     message = MIMEMultipart("related")
     message["From"] = sender_email
