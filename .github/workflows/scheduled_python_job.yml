@@ -2,7 +2,7 @@ name: Scheduled Python Job
 
 on:
   schedule:
-    - cron: '30 7 * * *'  # Run daily at midnight UTC
+    - cron: '34 7 * * *'  # Run daily at midnight UTC
   workflow_dispatch:
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
       - name: Install dependencies
         run: |
