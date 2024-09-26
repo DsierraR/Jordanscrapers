@@ -16,6 +16,7 @@ import traceback
 import logging
 import boto3
 from io import BytesIO
+import numpy as np
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -286,12 +287,100 @@ def create_visualizations(excel_buffer):
         logging.error(f"An error occurred while creating visualizations: {str(e)}")
         logging.error(traceback.format_exc())
 
-def send_email(excel_buffer, changes):
+def clean_name(name):
+    if isinstance(name, str):
+        match = re.search(r"(WTI|BRENT|RBOB|HO)", name)
+        return match.group(0) if match else None
+    return None
+
+def calculate_crack_spread(df):
+    for col in ['WTI', 'BRENT', 'RBOB', 'HO']:
+        if col not in df.columns:
+            df[col] = 0
+    
+    df['Adjusted Quantity'] = (
+        (1 * (df['WTI'] + df['BRENT']) / (1 + 2 + 3)) +
+        (2 * df['RBOB'] / (1 + 2 + 3)) +
+        (3 * df['HO'] / (1 + 2 + 3))
+    )
+    return df
+
+def custom_scale(df):
+    max_abs_value = df['Adjusted Quantity'].abs().max()
+    df['Scaled Quantity'] = df['Adjusted Quantity'] / max_abs_value
+    return df
+
+def load_and_process_data(excel_buffer):
+    xls = pd.ExcelFile(excel_buffer)
+    etf_data = {'AHL': [], 'DBMF': [], 'KMLM': [], 'SY': []}
+    
+    for sheet_name in xls.sheet_names:
+        etf_name = sheet_name.split()[0]
+        
+        if etf_name in etf_data:
+            df = pd.read_excel(xls, sheet_name)
+            df['Date'] = pd.to_datetime(df['Date'])
+            df['Commodity'] = df['Name'].apply(clean_name)
+            df['Quantity'] = df['Quantity'].astype(float)
+
+            df = df[df['Commodity'].notnull()]
+            df = df[['Date', 'Commodity', 'Quantity']]
+            etf_data[etf_name].append(df)
+    
+    for etf in etf_data:
+        if etf_data[etf]:
+            df = pd.concat(etf_data[etf])
+            df_pivot = df.pivot_table(index='Date', columns='Commodity', values='Quantity', aggfunc='sum').reset_index()
+            df_pivot.fillna(0, inplace=True)
+            
+            df_pivot = calculate_crack_spread(df_pivot)
+            df_pivot = custom_scale(df_pivot)
+            
+            if etf in ['AHL', 'DBMF']:
+                df_pivot['Adjusted Quantity'] /= 1000
+            
+            etf_data[etf] = df_pivot[['Date', 'Adjusted Quantity', 'Scaled Quantity']]
+    
+    return etf_data
+
+def create_weighted_proxy(etf_data, weights, use_scaled=False):
+    proxy = pd.DataFrame()
+    quantity_col = 'Scaled Quantity' if use_scaled else 'Adjusted Quantity'
+    
+    for etf, weight in weights.items():
+        if proxy.empty:
+            proxy = etf_data[etf].copy()
+            proxy[f'Weighted_{etf}'] = proxy[quantity_col] * weight
+        else:
+            proxy = proxy.merge(etf_data[etf], on='Date', suffixes=('', f'_{etf}'))
+            proxy[f'Weighted_{etf}'] = proxy[f'{quantity_col}_{etf}'] * weight
+    
+    proxy['Total'] = proxy[[col for col in proxy.columns if col.startswith('Weighted_')]].sum(axis=1)
+    return proxy
+
+def plot_results(proxy, title, ylabel):
+    plt.figure(figsize=(12, 6))
+    for col in proxy.columns:
+        if col.startswith('Weighted_'):
+            plt.plot(proxy['Date'], proxy[col], label=col)
+    plt.plot(proxy['Date'], proxy['Total'], label='Total Weighted Proxy', linewidth=2, color='black')
+    plt.legend()
+    plt.title(title)
+    plt.xlabel('Date')
+    plt.ylabel(ylabel)
+    plt.tight_layout()
+    img_buffer = BytesIO()
+    plt.savefig(img_buffer, format='png')
+    img_buffer.seek(0)
+    plt.close()
+    return img_buffer
+
+def send_email(excel_buffer, changes, new_plots):
     logging.info("Preparing to send email...")
     sender_email = "dsierraramirez115@gmail.com"
     receiver_email = ["diegosierra01@yahoo.com",
-                      "arnav.ashruchi@gmail.com",
-                     "jordan.valer@lmrpartners.com"]
+                      "arnav.ashruchi@gmail.com"
+                    ]
         
     password = password = os.environ['EMAIL_PASSWORD']  # App-specific password for Gmail
 
@@ -303,36 +392,50 @@ def send_email(excel_buffer, changes):
     html = """
     <html>
     <body>
-        <p>Please find attached the daily scraped data and visualizations.</p>
+    <p>Please find attached the daily scraped data and visualizations.</p>
     """
 
     if changes:
-        html += "<h3>Changes in quantities:</h3>"
-        changes_by_etf = {}
-        for etf, name, prev_quantity, current_quantity in changes:
-            if etf not in changes_by_etf:
-                changes_by_etf[etf] = []
-            changes_by_etf[etf].append(f"{name}: {prev_quantity} --> {current_quantity}")
-
-        for etf, changes_list in changes_by_etf.items():
-            html += f"<h4>Changes for {etf} ETF:</h4><ul>"
-            for change in changes_list:
-                html += f"<li>{change}</li>"
-            html += "</ul>"
+        html += "<p>Changes in quantities recorded:</p><ul>"
+        for change in changes:
+            html += f"<li>{change[0]} - {change[1]}: {change[2]} to {change[3]}</li>"
+        html += "</ul>"
     else:
         html += "<p>No changes in quantities recorded.</p>"
 
-    html += "<h3>Visualizations:</h3>"
-    for etf in ETF_ABBREVIATIONS.values():
-        html += f'<img src="cid:{etf}_positions">'
+    html += """
+    <h2>Existing Visualizations</h2>
+    <img src="cid:AHL_positions">
+    <img src="cid:DBMF_positions">
+    <img src="cid:KMLM_positions">
+    <img src="cid:SY_positions">
+    
+    <h2>CTA Proxies</h2>
+    <img src="cid:plot1">
+    <img src="cid:plot2">
+    </body>
+    </html>
+    """
 
-    html += "</body></html>"
     message.attach(MIMEText(html, "html"))
 
+    # Attach existing visualizations
+    for etf in ETF_ABBREVIATIONS.values():
+        with open(f'{etf}_positions.png', 'rb') as f:
+            img = MIMEImage(f.read())
+            img.add_header('Content-ID', f'<{etf}_positions>')
+            message.attach(img)
+
+    # Attach new plots
+    for i, plot in enumerate(new_plots, start=1):
+        img = MIMEImage(plot.getvalue())
+        img.add_header('Content-ID', f'<plot{i}>')
+        message.attach(img)
+
     # Attach Excel file
-    part = MIMEApplication(excel_buffer.getvalue(), Name='4scrapesdata.xlsx')
-    part['Content-Disposition'] = 'attachment; filename="4scrapesdata.xlsx"'
-    message.attach(part)
+    excel_attachment = MIMEApplication(excel_buffer.getvalue(), _subtype="xlsx")
+    excel_attachment.add_header('Content-Disposition', 'attachment', filename="4scrapesdata.xlsx")
+    message.attach(excel_attachment)
 
     # Attach visualizations
     for etf in ETF_ABBREVIATIONS.values():
@@ -352,10 +455,21 @@ def send_email(excel_buffer, changes):
         logging.error(f"An error occurred while sending email: {str(e)}")
         logging.error(traceback.format_exc())
 
-if __name__ == "__main__":
+def main():
     data = scrape_all_data()
-    if not data.empty:
-        changes, excel_buffer = update_excel(data)
-        if excel_buffer:
-            create_visualizations(excel_buffer)
-            send_email(excel_buffer, changes)
+    changes, excel_buffer = update_excel(data)
+    
+    if excel_buffer:
+        etf_data = load_and_process_data(excel_buffer)
+        weights = {'AHL': 0.05, 'DBMF': 0.6, 'KMLM': 0.05, 'SY': 0.3}
+        
+        proxy1 = create_weighted_proxy(etf_data, weights, use_scaled=False)
+        proxy2 = create_weighted_proxy(etf_data, weights, use_scaled=True)
+        
+        plot1 = plot_results(proxy1, 'CTA Proxy: Weighted ETFs with Division Adjustment', 'Weighted Adjusted Quantity')
+        plot2 = plot_results(proxy2, 'CTA Proxy: Weighted ETFs with Custom Scaling and 3-2-1 Crack Spread', 'Scaled Weighted Value')
+        
+        create_visualizations(excel_buffer)
+        send_email(excel_buffer, changes, [plot1, plot2])
+    else:
+        logging.error("Failed to update Excel file. Email not sent.")
