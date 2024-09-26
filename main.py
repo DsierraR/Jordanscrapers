@@ -436,7 +436,7 @@ def send_email(excel_buffer, changes, all_plots):
         message.attach(img)
 
     excel_attachment = MIMEApplication(excel_buffer.getvalue(), _subtype="xlsx")
-    excel_attachment.add_header('Content-Disposition', 'attachment', filename="scraped_data.xlsx")
+    excel_attachment.add_header('Content-Disposition', 'attachment', filename="4scrapesdata.xlsx")
     message.attach(excel_attachment)
 
     try:
