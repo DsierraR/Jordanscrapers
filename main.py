@@ -17,6 +17,8 @@ import logging
 import boto3
 from io import BytesIO
 import numpy as np
+from email.mime.base import MIMEBase
+from email import encoders
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -375,26 +377,18 @@ def plot_results(proxy, title, ylabel):
     plt.close()
     return img_buffer
 
-def send_email(excel_buffer, changes):
+def send_email(excel_buffer, changes, new_plots):
     logging.info("Preparing to send email...")
-    try:
     sender_email = "dsierraramirez115@gmail.com"
-    receiver_email = ["diegosierra01@yahoo.com",
-                      "arnav.ashruchi@gmail.com"]
-        
-    password = password = os.environ['EMAIL_PASSWORD']  # App-specific password for Gmail
+    receiver_email = ["diegosierra01@yahoo.com", "arnav.ashruchi@gmail.com"]
+    password = os.environ['EMAIL_PASSWORD']
 
     message = MIMEMultipart("related")
     message["From"] = sender_email
     message["To"] = ", ".join(receiver_email)
     message["Subject"] = "Daily Scraped Data"
 
-    html = """
-    <html>
-    <body>
-    <p>Please find attached the daily scraped data and visualizations.</p>
-    """
-
+    html = """<html><body><p>Please find attached the daily scraped data and visualizations.</p>"""
     if changes:
         html += "<p>Changes in quantities recorded:</p><ul>"
         for change in changes:
@@ -402,76 +396,53 @@ def send_email(excel_buffer, changes):
         html += "</ul>"
     else:
         html += "<p>No changes in quantities recorded.</p>"
-
-    html += """
-    <h2>Existing Visualizations</h2>
-    <img src="cid:AHL_positions">
-    <img src="cid:DBMF_positions">
-    <img src="cid:KMLM_positions">
-    <img src="cid:SY_positions">
-    
-    <h2>CTA Proxies</h2>
-    <img src="cid:plot1">
-    <img src="cid:plot2">
-    </body>
-    </html>
-    """
+    html += "</body></html>"
 
     message.attach(MIMEText(html, "html"))
 
-    # Attach existing visualizations
-    for etf in ETF_ABBREVIATIONS.values():
-        with open(f'{etf}_positions.png', 'rb') as f:
-            img = MIMEImage(f.read())
-            img.add_header('Content-ID', f'<{etf}_positions>')
-            message.attach(img)
-
-    # Attach new plots
-    for i, plot in enumerate(new_plots, start=1):
-        img = MIMEImage(plot.getvalue())
-        img.add_header('Content-ID', f'<plot{i}>')
-        message.attach(img)
-
     # Attach Excel file
-    excel_attachment = MIMEApplication(excel_buffer.getvalue(), _subtype="xlsx")
-    excel_attachment.add_header('Content-Disposition', 'attachment', filename="4scrapesdata.xlsx")
+    excel_attachment = MIMEBase("application", "vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    excel_buffer.seek(0)
+    excel_attachment.set_payload(excel_buffer.getvalue())
+    encoders.encode_base64(excel_attachment)
+    excel_attachment.add_header("Content-Disposition", f"attachment; filename=scraped_data.xlsx")
     message.attach(excel_attachment)
 
-    # Attach visualizations
-    for etf in ETF_ABBREVIATIONS.values():
-        img_path = f'{etf}_positions.png'
-        if os.path.exists(img_path):
-            with open(img_path, 'rb') as img:
-                img_part = MIMEImage(img.read())
-                img_part.add_header('Content-ID', f'<{etf}_positions>')
-                message.attach(img_part)
+    # Attach plots
+    for plot_name, plot_buffer in new_plots.items():
+        plot_attachment = MIMEImage(plot_buffer.getvalue())
+        plot_attachment.add_header("Content-Disposition", f"attachment; filename={plot_name}.png")
+        message.attach(plot_attachment)
 
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            logging.info("Connecting to SMTP server...")
             server.login(sender_email, password)
-            logging.info("Logged in successfully. Sending email...")
             server.send_message(message)
-            logging.info("Email sent successfully.")
+        logging.info("Email sent successfully")
     except Exception as e:
-        logging.error(f"An error occurred while sending the email: {str(e)}")
+        logging.error(f"Failed to send email: {str(e)}")
         logging.error(traceback.format_exc())
 
-def main():
-    data = scrape_all_data()
-    changes, excel_buffer = update_excel(data)
-    
-    if excel_buffer:
-        etf_data = load_and_process_data(excel_buffer)
-        weights = {'AHL': 0.05, 'DBMF': 0.6, 'KMLM': 0.05, 'SY': 0.3}
+# Main execution
+if __name__ == "__main__":
+    try:
+        scraped_data = scrape_all_data()
+        changes, excel_buffer = update_excel(scraped_data)
         
-        proxy1 = create_weighted_proxy(etf_data, weights, use_scaled=False)
-        proxy2 = create_weighted_proxy(etf_data, weights, use_scaled=True)
-        
-        plot1 = plot_results(proxy1, 'CTA Proxy: Weighted ETFs with Division Adjustment', 'Weighted Adjusted Quantity')
-        plot2 = plot_results(proxy2, 'CTA Proxy: Weighted ETFs with Custom Scaling and 3-2-1 Crack Spread', 'Scaled Weighted Value')
-        
+        if excel_buffer is None:
+            raise Exception("Failed to update Excel file")
+
         create_visualizations(excel_buffer)
-        send_email(excel_buffer, changes, [plot1, plot2])
-    else:
-        logging.error("Failed to update Excel file. Email not sent.")
+        
+        etf_data = load_and_process_data(excel_buffer)
+        weights = {'AHL': 0.25, 'DBMF': 0.25, 'KMLM': 0.25, 'SY': 0.25}
+        proxy = create_weighted_proxy(etf_data, weights)
+        
+        new_plots = {
+            'weighted_proxy': plot_results(proxy, 'Weighted Proxy of ETFs', 'Weighted Quantity')
+        }
+
+        send_email(excel_buffer, changes, new_plots)
+    except Exception as e:
+        logging.error(f"An error occurred in the main execution: {str(e)}")
+        logging.error(traceback.format_exc())
