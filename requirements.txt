@@ -9,7 +9,6 @@ fonttools==4.53.1
 idna==3.7
 jmespath==1.0.1
 kiwisolver==1.4.5
-matplotlib==3.9.1
 numpy==2.0.0
 openpyxl==3.1.5
 packaging==24.1
