@@ -375,8 +375,9 @@ def plot_results(proxy, title, ylabel):
     plt.close()
     return img_buffer
 
-def send_email(excel_buffer, changes, new_plots):
+def send_email(excel_buffer, changes):
     logging.info("Preparing to send email...")
+    try:
     sender_email = "dsierraramirez115@gmail.com"
     receiver_email = ["diegosierra01@yahoo.com",
                       "arnav.ashruchi@gmail.com"]
@@ -447,11 +448,13 @@ def send_email(excel_buffer, changes, new_plots):
 
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            logging.info("Connecting to SMTP server...")
             server.login(sender_email, password)
-            server.sendmail(sender_email, receiver_email, message.as_string())
-        logging.info("Email sent successfully.")
+            logging.info("Logged in successfully. Sending email...")
+            server.send_message(message)
+            logging.info("Email sent successfully.")
     except Exception as e:
-        logging.error(f"An error occurred while sending email: {str(e)}")
+        logging.error(f"An error occurred while sending the email: {str(e)}")
         logging.error(traceback.format_exc())
 
 def main():
