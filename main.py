@@ -241,53 +241,50 @@ def update_excel(data):
 
 def create_visualizations(excel_buffer):
     logging.info("Creating visualizations...")
+    plot_buffers = []
     try:
         df = pd.read_excel(excel_buffer, sheet_name=None)
-
-        # Define color scheme for products
         color_scheme = {
             'WTI': 'blue',
             'RBOB': 'green',
             'HO': 'red',
             'BRENT': 'orange'
         }
-
         for etf in ETF_ABBREVIATIONS.values():
             etf_data = {}
             for sheet_name, sheet_df in df.items():
                 if sheet_name.startswith(etf):
-                    contract_type = sheet_name.split()[1]  # Assuming format: "ETF CONTRACT_TYPE EXPIRATION"
+                    contract_type = sheet_name.split()[1]
                     if contract_type not in etf_data:
                         etf_data[contract_type] = []
                     etf_data[contract_type].extend(sheet_df[['Date', 'Quantity']].values.tolist())
-
             if etf_data:
                 plt.figure(figsize=(12, 6))
                 for contract_type, data in etf_data.items():
                     data_df = pd.DataFrame(data, columns=['Date', 'Quantity'])
                     data_df['Date'] = pd.to_datetime(data_df['Date'])
-                    # Aggregate quantities for the same date
                     data_df = data_df.groupby('Date')['Quantity'].sum().reset_index()
                     data_df = data_df.sort_values('Date')
-
-                    # Use the color scheme, default to black if not specified
                     color = color_scheme.get(contract_type, 'black')
                     plt.plot(data_df['Date'], data_df['Quantity'], label=contract_type, marker='o', color=color)
-
                 plt.title(f'Contract Positions for {etf}')
                 plt.xlabel('Date')
                 plt.ylabel('Quantity')
                 plt.legend()
                 plt.xticks(rotation=45)
-                plt.grid(True, linestyle='--', alpha=0.7)  # Add grid
+                plt.grid(True, linestyle='--', alpha=0.7)
                 plt.tight_layout()
-                plt.savefig(f'{etf}_positions.png')
+                img_buffer = BytesIO()
+                plt.savefig(img_buffer, format='png')
+                img_buffer.seek(0)
+                plot_buffers.append((f'{etf}_positions', img_buffer))
                 plt.close()
-
         logging.info("Visualizations created successfully.")
+        return plot_buffers
     except Exception as e:
         logging.error(f"An error occurred while creating visualizations: {str(e)}")
         logging.error(traceback.format_exc())
+        return []
 
 def clean_name(name):
     if isinstance(name, str):
@@ -382,6 +379,8 @@ def main():
     changes, excel_buffer = update_excel(data)
     
     if excel_buffer:
+        existing_plots = create_visualizations(excel_buffer)
+        
         etf_data = load_and_process_data(excel_buffer)
         weights = {'AHL': 0.05, 'DBMF': 0.6, 'KMLM': 0.05, 'SY': 0.3}
         
@@ -391,17 +390,16 @@ def main():
         plot1 = plot_results(proxy1, 'CTA Proxy: Weighted ETFs with Division Adjustment', 'Weighted Adjusted Quantity')
         plot2 = plot_results(proxy2, 'CTA Proxy: Weighted ETFs with Custom Scaling and 3-2-1 Crack Spread', 'Scaled Weighted Value')
         
-        existing_plots = create_visualizations(excel_buffer)
-        all_plots = existing_plots + [plot1, plot2]
+        all_plots = existing_plots + [('proxy1', plot1), ('proxy2', plot2)]
         
         send_email(excel_buffer, changes, all_plots)
     else:
         logging.error("Failed to update Excel file. Email not sent.")
 
-def send_email(excel_buffer, changes, plots):
+def send_email(excel_buffer, changes, all_plots):
     logging.info("Preparing to send email...")
     sender_email = "dsierraramirez115@gmail.com"
-    receiver_email = ["diegosierra01@yahoo.com", "arnav.ashruchi@gmail.com"]
+    receiver_email = ["diegosierra01@yahoo.com", "arnav.ashruchi@gmail.com", "jordan.valer@lmrpartners.com"]
     password = os.environ['EMAIL_PASSWORD']
 
     message = MIMEMultipart("related")
@@ -425,16 +423,16 @@ def send_email(excel_buffer, changes, plots):
 
     html += "<h2>Visualizations</h2>"
     
-    for i, plot in enumerate(plots, start=1):
-        html += f'<img src="cid:image{i}"><br><br>'
+    for plot_name, _ in all_plots:
+        html += f'<img src="cid:{plot_name}"><br><br>'
 
     html += "</body></html>"
 
     message.attach(MIMEText(html, "html"))
 
-    for i, plot in enumerate(plots, start=1):
-        img = MIMEImage(plot.getvalue())
-        img.add_header('Content-ID', f'<image{i}>')
+    for plot_name, plot_buffer in all_plots:
+        img = MIMEImage(plot_buffer.getvalue())
+        img.add_header('Content-ID', f'<{plot_name}>')
         message.attach(img)
 
     excel_attachment = MIMEApplication(excel_buffer.getvalue(), _subtype="xlsx")
