@@ -298,9 +298,10 @@ def calculate_crack_spread(df):
             df[col] = 0
     
     df['Adjusted Quantity'] = (
-        (1 * (df['WTI'] + df['BRENT']) / (1 + 2 + 3)) +
-        (2 * df['RBOB'] / (1 + 2 + 3)) +
-        (3 * df['HO'] / (1 + 2 + 3))
+        (1 * (df['WTI'])) + 
+        (1 * (df['BRENT'])) +
+        (1 * df['RBOB']) +
+        (1 * df['HO'])
     )
     return df
 
@@ -399,7 +400,7 @@ def main():
 def send_email(excel_buffer, changes, all_plots):
     logging.info("Preparing to send email...")
     sender_email = "dsierraramirez115@gmail.com"
-    receiver_email = ["diegosierra01@yahoo.com", "arnav.ashruchi@gmail.com", "jordan.valer@lmrpartners.com"]
+    receiver_email = ["diegosierra01@yahoo.com", "arnav.ashruchi@gmail.com"]
     password = os.environ['EMAIL_PASSWORD']
 
     message = MIMEMultipart("related")
