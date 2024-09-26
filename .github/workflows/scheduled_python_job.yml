@@ -41,9 +41,3 @@ jobs:
           git add -A
           git diff-index --quiet HEAD || (git commit -a -m "Updated by scheduled job" --allow-empty)
           git push
-      
-      - name: Display Python script output
-        if: always()
-        run: |
-          echo "Python script output:"
-          cat *.log  # Display the log file content
