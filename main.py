@@ -389,7 +389,7 @@ def main():
         proxy2 = create_weighted_proxy(etf_data, weights, use_scaled=True)
         
         plot1 = plot_results(proxy1, 'CTA Proxy: Weighted ETFs with Division Adjustment', 'Weighted Adjusted Quantity')
-        plot2 = plot_results(proxy2, 'CTA Proxy: Weighted ETFs with Custom Scaling and 3-2-1 Crack Spread', 'Scaled Weighted Value')
+        plot2 = plot_results(proxy2, 'CTA Proxy: Weighted ETFs with Custom Scaling and 1:1 Ratio', 'Scaled Weighted Value')
         
         all_plots = existing_plots + [('proxy1', plot1), ('proxy2', plot2)]
         
