@@ -379,8 +379,7 @@ def send_email(excel_buffer, changes, new_plots):
     logging.info("Preparing to send email...")
     sender_email = "dsierraramirez115@gmail.com"
     receiver_email = ["diegosierra01@yahoo.com",
-                      "arnav.ashruchi@gmail.com"
-                    ]
+                      "arnav.ashruchi@gmail.com"]
         
     password = password = os.environ['EMAIL_PASSWORD']  # App-specific password for Gmail
 
