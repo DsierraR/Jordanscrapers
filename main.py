@@ -383,7 +383,7 @@ def main():
         existing_plots = create_visualizations(excel_buffer)
         
         etf_data = load_and_process_data(excel_buffer)
-        weights = {'AHL': 0.05, 'DBMF': 0.6, 'KMLM': 0.05, 'SY': 0.3}
+        weights = {'AHL': 0.05, 'DBMF': 0.5, 'KMLM': 0.05, 'SY': 0.4}
         
         proxy1 = create_weighted_proxy(etf_data, weights, use_scaled=False)
         proxy2 = create_weighted_proxy(etf_data, weights, use_scaled=True)
