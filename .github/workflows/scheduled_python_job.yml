@@ -2,7 +2,7 @@ name: Scheduled Python Job
 
 on:
   schedule:
-    - cron: '15 13 * * *'  # Run time
+    - cron: '30 13 * * *'  # Run time
   workflow_dispatch:
 
 jobs:
