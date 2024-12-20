@@ -267,12 +267,20 @@ def create_visualizations(excel_buffer):
                     data_df = data_df.sort_values('Date')
                     color = color_scheme.get(contract_type, 'black')
                     plt.plot(data_df['Date'], data_df['Quantity'], label=contract_type, marker='o', color=color)
+                
                 plt.title(f'Contract Positions for {etf}')
                 plt.xlabel('Date')
                 plt.ylabel('Quantity')
                 plt.legend()
                 plt.xticks(rotation=45)
                 plt.grid(True, linestyle='--', alpha=0.7)
+                
+                # Only modify the DBMF visualization to disable scientific notation
+                if etf == 'DBMF':
+                    ax = plt.gca()
+                    ax.yaxis.set_major_formatter(ScalarFormatter(useOffset=False))
+                    ax.ticklabel_format(style='plain', axis='y')
+                
                 plt.tight_layout()
                 img_buffer = BytesIO()
                 plt.savefig(img_buffer, format='png')
