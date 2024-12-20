@@ -19,6 +19,7 @@ from io import BytesIO
 import numpy as np
 from email.mime.base import MIMEBase
 from email import encoders
+from matplotlib.ticker import ScalarFormatter
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
