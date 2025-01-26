@@ -409,7 +409,7 @@ def main():
 def send_email(excel_buffer, changes, all_plots):
     logging.info("Preparing to send email...")
     sender_email = "dsierraramirez115@gmail.com"
-    receiver_email = ["diegosierra01@yahoo.com", "arnav.ashruchi@gmail.com"]
+    receiver_email = ["diegosierra01@yahoo.com", "arnav.ashruchi@gmail.com","jordan.valer@lmrpartners.com"]
     password = os.environ['EMAIL_PASSWORD']
 
     message = MIMEMultipart("related")
