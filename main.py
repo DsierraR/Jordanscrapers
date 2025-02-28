@@ -276,7 +276,6 @@ def create_visualizations(excel_buffer):
                 plt.xticks(rotation=45)
                 plt.grid(True, linestyle='--', alpha=0.7)
                 
-                # Only modify the DBMF visualization to disable scientific notation
                 if etf == 'DBMF':
                     ax = plt.gca()
                     ax.yaxis.set_major_formatter(ScalarFormatter(useOffset=False))
@@ -367,11 +366,12 @@ def create_weighted_proxy(etf_data, weights, use_scaled=False):
     proxy['Total'] = proxy[[col for col in proxy.columns if col.startswith('Weighted_')]].sum(axis=1)
     return proxy
 
-def plot_results(proxy, title, ylabel):
-    plt.figure(figsize=(12, 6))
-    for col in proxy.columns:
-        if col.startswith('Weighted_'):
-            plt.plot(proxy['Date'], proxy[col], label=col)
+def plot_results(proxy, title, ylabel, only_total_line=False):
+    plt.figure(figsize=(12, 6)).
+    if not only_total_line:
+        for col in proxy.columns:
+            if col.startswith('Weighted_'):
+                plt.plot(proxy['Date'], proxy[col], label=col)
     plt.plot(proxy['Date'], proxy['Total'], label='Total Weighted Proxy', linewidth=2, color='black')
     plt.legend()
     plt.title(title)
@@ -383,6 +383,7 @@ def plot_results(proxy, title, ylabel):
     img_buffer.seek(0)
     plt.close()
     return img_buffer
+
 
 def main():
     data = scrape_all_data()
@@ -398,7 +399,8 @@ def main():
         proxy2 = create_weighted_proxy(etf_data, weights, use_scaled=True)
         
         plot1 = plot_results(proxy1, 'CTA Proxy: Weighted ETFs with Division Adjustment', 'Weighted Adjusted Quantity')
-        plot2 = plot_results(proxy2, 'CTA Proxy: Weighted ETFs with Custom Scaling and 1:1 Ratio', 'Scaled Weighted Value')
+        # For the second plot, set only_total_line=True to only plot the black line.
+        plot2 = plot_results(proxy2, 'CTA Proxy: Weighted ETFs with Custom Scaling and 1:1 Ratio', 'Scaled Weighted Value', only_total_line=True)
         
         all_plots = existing_plots + [('proxy1', plot1), ('proxy2', plot2)]
         
