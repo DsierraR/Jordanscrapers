@@ -367,7 +367,7 @@ def create_weighted_proxy(etf_data, weights, use_scaled=False):
     return proxy
 
 def plot_results(proxy, title, ylabel, only_total_line=False):
-    plt.figure(figsize=(12, 6)).
+    plt.figure(figsize=(12, 6))
     if not only_total_line:
         for col in proxy.columns:
             if col.startswith('Weighted_'):
