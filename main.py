@@ -20,6 +20,7 @@ import numpy as np
 from email.mime.base import MIMEBase
 from email import encoders
 from matplotlib.ticker import ScalarFormatter
+from urllib.parse import urljoin
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -50,19 +51,27 @@ def scrape_american_beacon():
     url = 'https://www.americanbeaconfunds.com/etfs/ahlt.aspx'
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
-    excel_link = soup.find('a', href=re.compile(r'/downloads/holdings/AmericanBeaconAHLTrend\.xls'))['href']
-    full_excel_url = f'https://www.americanbeaconfunds.com{excel_link}'
-    logging.info(f'Downloading the Excel file from {full_excel_url}...')
-    excel_response = requests.get(full_excel_url)
-    df = pd.read_excel(BytesIO(excel_response.content))
-    df.columns = df.columns.str.strip()  # Clean column names
+    
+    link_tag = soup.find('a', href=re.compile(r'\d{8}_AHLT_Holdings\.csv'))
+    if not link_tag:
+        logging.error("Could not find the CSV download link on the American Beacon page.")
+        return pd.DataFrame()
+    
+    csv_link = link_tag['href']
+    full_csv_url = urljoin(url, csv_link)
+    logging.info(f'Downloading the CSV file from {full_csv_url}...')
+    
+    csv_response = requests.get(full_csv_url)
+    df = pd.read_csv(BytesIO(csv_response.content))
+    df.columns = df.columns.str.strip()  
 
     pattern = re.compile(r'BRENT CRUDE|WTI CRUDE', re.IGNORECASE)
-    filtered_df = df[df['constituent_description'].str.contains(pattern, na=False)][['constituent_description', 'shares_held_of_constituent', 'constituent_weight']]
+    filtered_df = df[df['Description'].str.contains(pattern, na=False)][['Description', 'Shares/Quantity', 'Weight']]
     filtered_df.columns = ['name', 'quantity', 'weight']
     filtered_df['date'] = datetime.now(local_tz).strftime('%Y-%m-%d')
     filtered_df['ETF'] = 'American Beacon'
     return filtered_df
+
 
 def scrape_imgp_funds():
     logging.info('Starting the scraping process for IMGP Funds...')
