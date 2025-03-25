@@ -46,6 +46,8 @@ ETF_ABBREVIATIONS = {
     'Simplify': 'SY'
 }
 
+from urllib.parse import urljoin
+
 def scrape_american_beacon():
     logging.info('Starting the scraping process for American Beacon...')
     url = 'https://www.americanbeaconfunds.com/etfs/ahlt.aspx'
@@ -63,16 +65,15 @@ def scrape_american_beacon():
     
     csv_response = requests.get(full_csv_url)
     df = pd.read_csv(BytesIO(csv_response.content))
-    df.columns = df.columns.str.strip()  
+    df.columns = df.columns.str.strip()
 
     pattern = re.compile(r'BRENT CRUDE|WTI CRUDE', re.IGNORECASE)
-    filtered_df = df[df['Description'].str.contains(pattern, na=False)][['Description', 'Shares/Quantity', 'Weight']]
+    filtered_df = df[df['constituent_description'].str.contains(pattern, na=False)][['constituent_description', 'shares_held_of_constituent', 'constituent_weight']]
     filtered_df.columns = ['name', 'quantity', 'weight']
     filtered_df['date'] = datetime.now(local_tz).strftime('%Y-%m-%d')
     filtered_df['ETF'] = 'American Beacon'
     return filtered_df
-
-
+    
 def scrape_imgp_funds():
     logging.info('Starting the scraping process for IMGP Funds...')
     url = 'https://imgpfunds.com/im-dbi-managed-futures-strategy-etf/'
