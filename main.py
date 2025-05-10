@@ -75,29 +75,32 @@ def scrape_american_beacon():
     return filtered_df
     
 def scrape_imgp_funds():
-    logging.info('Starting the scraping process for IMGP Funds...')
+    logging.info("Starting the scraping process for IMGP Funds...")
     url = 'https://imgpfunds.com/im-dbi-managed-futures-strategy-etf/'
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
 
-    link_tag = soup.find('a', href=re.compile(r'DBMF.*?\.xlsx'))
+    link_tag = soup.find('a', href=re.compile(r'/wp-content/uploads/pdfs/holdings/DBMF-Holdings\.xlsx'))
     if not link_tag:
-        logging.warning("No DBMF Holdings Excel file found on the IMGP Funds site.")
-        return None  
+        logging.warning("No DBMF-Holdings Excel link found. Skipping IMGP Funds.")
+        return pd.DataFrame()
+
     excel_link = link_tag['href']
+    logging.info(f"Downloading the Excel file from {excel_link}...")
+    file_response = requests.get(excel_link)
 
-    full_excel_url = urljoin(url, excel_link)
-    logging.info(f'Downloading the Excel file from {full_excel_url}...')
+    if file_response.status_code != 200:
+        logging.warning(f"Failed to download IMGP file (status code {file_response.status_code}). Skipping.")
+        return pd.DataFrame()
 
-    excel_response = requests.get(full_excel_url)
-    df = pd.read_excel(BytesIO(excel_response.content), skiprows=5)
-    df.columns = df.columns.str.strip()
+    df = pd.read_excel(BytesIO(file_response.content))
 
-    pattern = re.compile(r'BRENT CRUDE|WTI CRUDE', re.IGNORECASE)
+    pattern = r'BRENT CRUDE|WTI CRUDE'
     filtered_df = df[df['DESCRIPTION'].str.contains(pattern, na=False)][['DESCRIPTION', 'SHARES', 'PCT_HOLDINGS']]
     filtered_df.columns = ['name', 'quantity', 'weight']
     filtered_df['date'] = datetime.now(local_tz).strftime('%Y-%m-%d')
     filtered_df['ETF'] = 'IMGP Funds'
+    
     return filtered_df
 
 def scrape_kfa_funds():
@@ -120,6 +123,7 @@ def scrape_kfa_funds():
     filtered_df.columns = ['name', 'quantity', 'weight']
     filtered_df['date'] = datetime.now(local_tz).strftime('%Y-%m-%d')
     filtered_df['ETF'] = 'KFA Funds'
+    
     return filtered_df
 
 def scrape_simplify():
