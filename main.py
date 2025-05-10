@@ -79,9 +79,17 @@ def scrape_imgp_funds():
     url = 'https://imgpfunds.com/im-dbi-managed-futures-strategy-etf/'
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
-    excel_link = soup.find('a', href=re.compile(r'/wp-content/uploads/pdfs/holdings/DBMF-Holdings\.xlsx'))['href']
-    full_excel_url = f'https://imgpfunds.com{excel_link}'
+
+    link_tag = soup.find('a', href=re.compile(r'/wp-content/uploads/.*DBMF-Holdings.*\.xlsx'))
+    
+    if not link_tag:
+        logging.error("Could not find the Excel download link on the IMGP Funds page.")
+        return pd.DataFrame()
+    
+    excel_link = link_tag['href']
+    full_excel_url = urljoin(url, excel_link)
     logging.info(f'Downloading the Excel file from {full_excel_url}...')
+
     excel_response = requests.get(full_excel_url)
     df = pd.read_excel(BytesIO(excel_response.content), skiprows=5)
     df.columns = df.columns.str.strip()
