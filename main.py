@@ -75,7 +75,6 @@ def scrape_american_beacon():
     return filtered_df
     
 def scrape_imgp_funds():
-    logging.info("Starting the scraping process for IMGP Funds...")
     url = 'https://imgpfunds.com/im-dbi-managed-futures-strategy-etf/'
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
@@ -85,7 +84,6 @@ def scrape_imgp_funds():
         link_tag = soup.find('a', href=re.compile(r'DBMF-Holdings\.xlsx'))
         
     if not link_tag:
-        logging.warning("No DBMF-Holdings Excel link found. Skipping IMGP Funds.")
         return pd.DataFrame()
 
     excel_link = link_tag['href']
@@ -93,17 +91,23 @@ def scrape_imgp_funds():
     if not excel_link.startswith(('http://', 'https://')):
         excel_link = urljoin(url, excel_link)
         
-    logging.info(f"Downloading the Excel file from {excel_link}...")
     file_response = requests.get(excel_link)
 
     if file_response.status_code != 200:
-        logging.warning(f"Failed to download IMGP file (status code {file_response.status_code}). Skipping.")
         return pd.DataFrame()
 
     df = pd.read_excel(BytesIO(file_response.content))
-
+    df.columns = [col.strip().upper() for col in df.columns]
+    
+    description_col = next((col for col in df.columns if 'DESCRIPTION' in col), None)
+    shares_col = next((col for col in df.columns if 'SHARES' in col), None)
+    holdings_col = next((col for col in df.columns if 'PCT' in col and 'HOLDINGS' in col), None)
+    
+    if not all([description_col, shares_col, holdings_col]):
+        return pd.DataFrame()
+    
     pattern = r'BRENT CRUDE|WTI CRUDE'
-    filtered_df = df[df['DESCRIPTION'].str.contains(pattern, na=False)][['DESCRIPTION', 'SHARES', 'PCT_HOLDINGS']]
+    filtered_df = df[df[description_col].str.contains(pattern, na=False)][[description_col, shares_col, holdings_col]]
     filtered_df.columns = ['name', 'quantity', 'weight']
     filtered_df['date'] = datetime.now(local_tz).strftime('%Y-%m-%d')
     filtered_df['ETF'] = 'IMGP Funds'
