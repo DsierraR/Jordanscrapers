@@ -80,12 +80,19 @@ def scrape_imgp_funds():
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
 
-    link_tag = soup.find('a', href=re.compile(r'/wp-content/uploads/pdfs/holdings/DBMF-Holdings\.xlsx'))
+    link_tag = soup.find('a', href=re.compile(r'/wp-content/uploads/\d{4}/\d{2}/DBMF-Holdings\.xlsx'))
+    if not link_tag:
+        link_tag = soup.find('a', href=re.compile(r'DBMF-Holdings\.xlsx'))
+        
     if not link_tag:
         logging.warning("No DBMF-Holdings Excel link found. Skipping IMGP Funds.")
         return pd.DataFrame()
 
     excel_link = link_tag['href']
+    
+    if not excel_link.startswith(('http://', 'https://')):
+        excel_link = urljoin(url, excel_link)
+        
     logging.info(f"Downloading the Excel file from {excel_link}...")
     file_response = requests.get(excel_link)
 
